@@ -1,0 +1,905 @@
+import { createContext, useContext, useState, useEffect } from "react";
+import {
+  members as initialMembers,
+  admins as initialAdmins,
+  invoices as initialInvoices,
+  recentPayments as initialRecentPayments,
+  paymentHistory as initialPaymentHistory,
+  communicationLog as initialCommunicationLog,
+  memberUpcomingPayments as initialMemberUpcomingPayments,
+  memberInvoices as initialMemberInvoices,
+  memberPaymentHistory as initialMemberPaymentHistory,
+  paymentMethods as initialPaymentMethods,
+  metrics as initialMetrics,
+  reminderRules as initialReminderRules,
+} from "../data";
+
+
+
+const AppContext = createContext();
+
+export function AppProvider({ children }) {
+  const [members, setMembers] = useState([]);
+  const [admins,setAdmins] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [donations, setDonations] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [recentPayments, setRecentPayments] = useState(() => {
+    const saved = localStorage.getItem("recentPayments");
+    return saved ? JSON.parse(saved) : initialRecentPayments;
+  });
+
+  const [paymentHistory, setPaymentHistory] = useState(() => {
+    const saved = localStorage.getItem("paymentHistory");
+    return saved ? JSON.parse(saved) : initialPaymentHistory;
+  });
+
+  const [communicationLog, setCommunicationLog] = useState(() => {
+    const saved = localStorage.getItem("communicationLog");
+    return saved ? JSON.parse(saved) : initialCommunicationLog;
+  });
+
+  // Reminder logs from backend (automatic + manual email reminders)
+  const [reminderLogs, setReminderLogs] = useState([]);
+
+  // Password reset requests
+  const [passwordResetRequests, setPasswordResetRequests] = useState([]);
+
+  const [paymentMethods, setPaymentMethods] = useState(initialPaymentMethods); // Will be loaded from database
+
+  const [metrics, setMetrics] = useState(() => {
+    const saved = localStorage.getItem("metrics");
+    return saved ? JSON.parse(saved) : initialMetrics;
+  });
+
+  const [reminderRules, setReminderRules] = useState(() => {
+    try {
+      const saved = localStorage.getItem("reminderRules");
+      return saved ? JSON.parse(saved) : initialReminderRules;
+    } catch {
+      return initialReminderRules;
+    }
+  });
+
+  const [automationEnabled, setAutomationEnabled] = useState(true);
+
+  const [reminderTemplates, setReminderTemplates] = useState(() => {
+    const saved = localStorage.getItem("reminderTemplates");
+    return saved ? JSON.parse(saved) : {
+      upcomingDue: "Hi {{member_name}}, friendly reminder your {{period}} subscription of ${{amount}} is due on {{due_date}}. You can pay via FPS, PayMe, or card. Thank you!",
+      overdue: "Hi {{member_name}}, your {{period}} contribution of ${{amount}} is now overdue. Please settle via the member portal or reply once paid.",
+    };
+  });
+
+  const [organizationInfo, setOrganizationInfo] = useState(() => {
+    const saved = localStorage.getItem("organizationInfo");
+    return saved ? JSON.parse(saved) : {
+      name: "Subscription Manager HK",
+      email: "support@subscriptionhk.org",
+      phone: "+852 2800 1122",
+      address: "123 Central Street, Hong Kong",
+    };
+  });
+
+  // User locale preference for number formatting
+  const [userLocale, setUserLocale] = useState(() => {
+    try {
+      const saved = localStorage.getItem("userLocale");
+      if (saved) {
+        return saved;
+      }
+      // Try to detect browser locale
+      const browserLocale = navigator.language || navigator.userLanguage;
+      return browserLocale || "en-US";
+    } catch (error) {
+      console.error("Error getting user locale:", error);
+      return "en-US";
+    }
+  });
+
+  const updateUserLocale = (locale) => {
+    try {
+      localStorage.setItem("userLocale", locale);
+      setUserLocale(locale);
+      // Dispatch custom event to notify components of locale change
+      window.dispatchEvent(new CustomEvent("localeChanged", { detail: { locale } }));
+    } catch (error) {
+      console.error("Error setting user locale:", error);
+    }
+  };
+
+  // adminUsers removed - now using admins from MongoDB API
+
+  const [selectedMember, setSelectedMember] = useState(null);
+  // In development, use empty string to use Vite proxy (localhost:4000)
+  // In production, use VITE_API_URL if set
+  const apiBaseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+
+  // Fetch data from server on mount
+  // Retry helper function
+  const retryFetch = async (fetchFn, maxRetries = 3, delay = 2000) => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        await fetchFn();
+        return; // Success, exit
+      } catch (error) {
+        if (i === maxRetries - 1) {
+          console.error(`Failed after ${maxRetries} attempts:`, error);
+          throw error;
+        }
+        console.log(`Retry ${i + 1}/${maxRetries} in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  };
+
+  // Fetch members from server
+  const fetchMembers = async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/members`);
+
+      if (!response.ok) throw new Error('Failed to fetch members');
+      const data = await response.json();
+      setMembers(data);
+      console.log('✓ Loaded', data.length, 'members from server');
+    } catch (error) {
+      console.error('Error fetching members:', error);
+      // Set empty array instead of dummy data - will retry automatically
+      setMembers([]);
+      throw error; // Re-throw to allow retry mechanism
+    }
+  };
+
+   // Fetch Admins from server
+   const fetchAdmins = async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/admins`);
+
+      if (!response.ok) throw new Error('Failed to fetch admins');
+      const data = await response.json();
+      setAdmins(data);
+      console.log('✓ Loaded', data.length, 'Admins from server');
+    } catch (error) {
+      console.error('Error fetching Admins:', error);
+      // Set empty array instead of dummy data - will retry automatically
+      setAdmins([]);
+      throw error; // Re-throw to allow retry mechanism
+    }
+  };
+
+  // Fetch invoices from server
+  const fetchInvoices = async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/invoices`);
+      if (!response.ok) throw new Error('Failed to fetch invoices');
+      const data = await response.json();
+      setInvoices(data);
+      console.log('✓ Loaded', data.length, 'invoices from MongoDB');
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+      // Set empty array instead of dummy data - will retry automatically
+      setInvoices([]);
+      throw error; // Re-throw to allow retry mechanism
+    }
+  };
+
+  // Fetch payments from server
+  const fetchPayments = async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/payments`);
+      if (!response.ok) throw new Error('Failed to fetch payments');
+      const data = await response.json();
+      setPayments(data);
+      // Sync paymentHistory with MongoDB payments
+      setPaymentHistory(data);
+      setRecentPayments(data.slice(0, 10)); // Keep recent payments for dashboard
+      console.log('✓ Loaded', data.length, 'payments from MongoDB');
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+      // Set empty arrays instead of dummy data - will retry automatically
+      setPayments([]);
+      setPaymentHistory([]);
+      setRecentPayments([]);
+      throw error; // Re-throw to allow retry mechanism
+    }
+  };
+
+  // Fetch donations from server
+  const fetchDonations = async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/donations`);
+      if (!response.ok) throw new Error('Failed to fetch donations');
+      const data = await response.json();
+      setDonations(data);
+      console.log('✓ Loaded', data.length, 'donations from MongoDB');
+    } catch (error) {
+      console.error('Error fetching donations:', error);
+      setDonations([]);
+    }
+  };
+
+  // Fetch expenses from server
+  const fetchExpenses = async (organizationId = null) => {
+    try {
+      let url = `${apiBaseUrl}/api/expenses`;
+      if (organizationId) {
+        url = `${apiBaseUrl}/api/expenses/organization/${organizationId}`;
+      }
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch expenses');
+      const data = await response.json();
+      setExpenses(data);
+      console.log('✓ Loaded', data.length, 'expenses from MongoDB');
+      return data;
+    } catch (error) {
+      console.error('Error fetching expenses:', error);
+      setExpenses([]);
+      return [];
+    }
+  };
+
+  // Fetch payment methods from server
+  const fetchPaymentMethods = async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/payment-methods`);
+      if (!response.ok) throw new Error('Failed to fetch payment methods');
+      const data = await response.json();
+      
+      // If database is empty, initialize with default payment methods
+      if (data.length === 0) {
+        console.log('⚠️ No payment methods in database, initializing defaults...');
+        const defaultMethods = [
+          { name: "Alipay", visible: false, qrImageUrl: "", details: [] },
+          { name: "PayMe", visible: false, qrImageUrl: "", details: [] },
+          { name: "FPS", visible: true, details: ["FPS ID 1234567"] },
+          { name: "Direct Bank Transfer", visible: true, details: ["HSBC Hong Kong", "123-456789-001", "Subscription Manager HK"] },
+          { name: "Credit/Debit Cards", visible: true, details: ["Gateway: Stripe"] },
+        ];
+        
+        // Save defaults to database
+        for (const method of defaultMethods) {
+          try {
+            await fetch(`${apiBaseUrl}/api/payment-methods`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(method),
+            });
+          } catch (err) {
+            console.error(`Error initializing payment method ${method.name}:`, err);
+          }
+        }
+        
+        setPaymentMethods(defaultMethods);
+        console.log('✓ Initialized default payment methods in database');
+      } else {
+        setPaymentMethods(data);
+        console.log('✓ Loaded', data.length, 'payment methods from MongoDB');
+      }
+    } catch (error) {
+      console.error('Error fetching payment methods:', error);
+      // Set empty array instead of dummy data - will retry automatically
+      setPaymentMethods([]);
+      throw error; // Re-throw to allow retry mechanism
+    }
+  };
+
+  // Fetch reminder logs (automatic + manual email reminders) from server
+  const fetchReminderLogs = async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/reminders/logs`);
+      if (!response.ok) throw new Error('Failed to fetch reminder logs');
+      const data = await response.json();
+      setReminderLogs(data);
+      console.log('✓ Loaded', data.length, 'reminder logs from MongoDB');
+    } catch (error) {
+      console.error('Error fetching reminder logs:', error);
+      setReminderLogs([]);
+    }
+  };
+
+  // Fetch password reset requests from server
+  const fetchPasswordResetRequests = async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/auth/password-reset-requests`);
+      if (!response.ok) throw new Error('Failed to fetch password reset requests');
+      const data = await response.json();
+      setPasswordResetRequests(data);
+      console.log('✓ Loaded', data.length, 'password reset requests from MongoDB');
+    } catch (error) {
+      console.error('Error fetching password reset requests:', error);
+      setPasswordResetRequests([]);
+    }
+  };
+
+  // Fetch data on mount - moved after function definitions
+  useEffect(() => {
+    // Fetch data in background without blocking page render
+    // This improves perceived performance - page shows immediately
+    const fetchAllData = async () => {
+      try {
+        // Fetch critical data first (members, admins, invoices)
+        const criticalFetches = Promise.allSettled([
+          fetchMembers(),
+          fetchAdmins(),
+          fetchInvoices(),
+        ]);
+        
+        // Then fetch remaining data
+        const remainingFetches = Promise.allSettled([
+          fetchPayments(),
+          fetchDonations(),
+          fetchPaymentMethods(),
+          fetchReminderLogs(),
+        ]);
+        
+        // Wait for all but don't block render
+        await Promise.allSettled([criticalFetches, remainingFetches]);
+        // Set loading to false after data fetching completes
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching initial data:', error);
+        // Set loading to false even on error so page can render
+        setLoading(false);
+      }
+    };
+    
+    // Start fetching immediately but don't block
+    fetchAllData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run once on mount
+
+  // Persist other data to localStorage
+  useEffect(() => {
+    localStorage.setItem("recentPayments", JSON.stringify(recentPayments));
+  }, [recentPayments]);
+
+  useEffect(() => {
+    localStorage.setItem("paymentHistory", JSON.stringify(paymentHistory));
+  }, [paymentHistory]);
+
+  useEffect(() => {
+    localStorage.setItem("communicationLog", JSON.stringify(communicationLog));
+  }, [communicationLog]);
+
+  // Payment methods are now stored in MongoDB, not localStorage
+  // useEffect removed - payment methods persist in database
+
+  useEffect(() => {
+    localStorage.setItem("metrics", JSON.stringify(metrics));
+  }, [metrics]);
+
+  useEffect(() => {
+    localStorage.setItem("reminderRules", JSON.stringify(reminderRules));
+  }, [reminderRules]);
+
+
+  useEffect(() => {
+    localStorage.setItem("reminderTemplates", JSON.stringify(reminderTemplates));
+  }, [reminderTemplates]);
+
+  useEffect(() => {
+    localStorage.setItem("organizationInfo", JSON.stringify(organizationInfo));
+  }, [organizationInfo]);
+
+  useEffect(() => {
+    // adminUsers localStorage removed - now using MongoDB API
+  }, []);
+
+  // CRUD Operations for Members (Server-based)
+  const addMember = async (member) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(member),
+      });
+      if (!response.ok) throw new Error('Failed to add member');
+      const newMember = await response.json();
+      setMembers([...members, newMember]);
+      updateMetrics({ totalMembers: metrics.totalMembers + 1 });
+      console.log('✓ Member added to server:', newMember);
+      return newMember;
+    } catch (error) {
+      console.error('Error adding member:', error);
+      throw error;
+    }
+  };
+
+  const updateMember = async (id, updatedData) => {
+    try {
+        const response = await fetch(`${apiBaseUrl}/api/members/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData),
+      });
+      if (!response.ok) throw new Error('Failed to update member');
+      const updated = await response.json();
+      setMembers(members.map((m) => (m.id === id ? updated : m)));
+      console.log('✓ Member updated on server:', updated);
+    } catch (error) {
+      console.error('Error updating member:', error);
+      throw error;
+    }
+  };
+
+  const deleteMember = async (id) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/members/${id}`, { method: 'DELETE' });
+
+      if (!response.ok) throw new Error('Failed to delete member');
+      setMembers(members.filter((m) => m.id !== id));
+      setInvoices(invoices.filter((inv) => inv.memberId !== id));
+      updateMetrics({ totalMembers: metrics.totalMembers - 1 });
+      console.log('✓ Member deleted from server:', id);
+    } catch (error) {
+      console.error('Error deleting member:', error);
+      throw error;
+    }
+  };
+
+  // CRUD Operations for Invoices (Server-based)
+  const addInvoice = async (invoice) => {
+    try {
+        const response = await fetch(`${apiBaseUrl}/api/invoices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(invoice),
+      });
+      if (!response.ok) throw new Error('Failed to add invoice');
+      const newInvoice = await response.json();
+      setInvoices([newInvoice, ...invoices]);
+      console.log('✓ Invoice added to server:', newInvoice);
+      return newInvoice;
+    } catch (error) {
+      console.error('Error adding invoice:', error);
+      throw error;
+    }
+  };
+
+  const updateInvoice = async (id, updatedData) => {
+    try {
+        const response = await fetch(`${apiBaseUrl}/api/invoices/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData),
+      });
+      if (!response.ok) throw new Error('Failed to update invoice');
+      const updated = await response.json();
+      setInvoices(invoices.map((inv) => (inv.id === id ? updated : inv)));
+      
+      // If status changed to Paid, update metrics
+      if (updatedData.status === "Paid") {
+        const invoice = invoices.find((inv) => inv.id === id);
+        if (invoice && invoice.status !== "Paid") {
+          const amount = parseFloat(invoice.amount.replace("$", ""));
+          updateMetrics({
+            collectedMonth: metrics.collectedMonth + amount,
+            collectedYear: metrics.collectedYear + amount,
+            outstanding: metrics.outstanding - amount,
+          });
+        }
+      }
+      console.log('✓ Invoice updated on server:', updated);
+    } catch (error) {
+      console.error('Error updating invoice:', error);
+      throw error;
+    }
+  };
+
+  const deleteInvoice = async (id) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/invoices/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete invoice');
+      setInvoices(invoices.filter((inv) => inv.id !== id));
+      console.log('✓ Invoice deleted from server:', id);
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
+      throw error;
+    }
+  };
+
+  // Payment Operations
+  const addPayment = async (payment) => {
+    try {
+      const paymentData = {
+        ...payment,
+        date: payment.date || new Date().toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+      };
+      
+      // Save payment to MongoDB
+      const response = await fetch(`${apiBaseUrl}/api/payments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(paymentData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save payment');
+      }
+      
+      const newPayment = await response.json();
+      
+      // Update local state
+      setPayments([newPayment, ...payments]);
+      setRecentPayments([newPayment, ...recentPayments]);
+      setPaymentHistory([newPayment, ...paymentHistory]);
+      
+      // Update related invoice
+      if (payment.invoiceId) {
+        await updateInvoice(payment.invoiceId, { 
+          status: "Paid", 
+          method: payment.method, 
+          reference: payment.reference,
+          screenshot: payment.screenshot || payment.screenshotUrl,
+          paidToAdmin: payment.paidToAdmin,
+          paidToAdminName: payment.paidToAdminName,
+        });
+      }
+      
+      // Update metrics
+      const amount = parseFloat(payment.amount.replace("$", ""));
+      updateMetrics({
+        collectedMonth: metrics.collectedMonth + amount,
+        collectedYear: metrics.collectedYear + amount,
+        outstanding: Math.max(0, metrics.outstanding - amount),
+      });
+
+      console.log('✓ Payment saved to MongoDB:', newPayment);
+      return newPayment;
+    } catch (error) {
+      console.error('Error adding payment:', error);
+      // Still update local state for UI feedback, but log the error
+      const fallbackPayment = {
+        ...payment,
+        date: payment.date || new Date().toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+      };
+      setRecentPayments([fallbackPayment, ...recentPayments]);
+      setPaymentHistory([fallbackPayment, ...paymentHistory]);
+      throw error;
+    }
+  };
+
+  // Communication Operations
+  const addCommunication = (comm) => {
+    const newComm = {
+      ...comm,
+      date: new Date().toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+      status: "Delivered",
+    };
+    setCommunicationLog([newComm, ...communicationLog]);
+    return newComm;
+  };
+
+  // Payment Methods Operations
+  const updatePaymentMethod = async (name, updatedData) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/payment-methods/${name}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update payment method');
+      }
+
+      const updatedMethod = await response.json();
+      
+      // Update local state
+      setPaymentMethods(
+        paymentMethods.map((pm) => (pm.name === name ? updatedMethod : pm))
+      );
+      
+      console.log('✓ Payment method updated in database:', updatedMethod);
+      return updatedMethod;
+    } catch (error) {
+      console.error('Error updating payment method:', error);
+      // Still update local state for immediate UI feedback
+      setPaymentMethods(
+        paymentMethods.map((pm) => (pm.name === name ? { ...pm, ...updatedData } : pm))
+      );
+      throw error;
+    }
+  };
+
+  // Metrics Operations
+  const updateMetrics = (updates) => {
+    setMetrics({ ...metrics, ...updates });
+  };
+
+  // Reset all data to initial values from data.js
+  const resetAllData = () => {
+    localStorage.clear();
+    setMembers(initialMembers);
+    setAdmins(initialAdmins);
+    setInvoices(initialInvoices);
+    setRecentPayments(initialRecentPayments);
+    setPaymentHistory(initialPaymentHistory);
+    setCommunicationLog(initialCommunicationLog);
+    setPaymentMethods(initialPaymentMethods);
+    setMetrics(initialMetrics);
+    setReminderRules(initialReminderRules);
+    setAutomationEnabled(true);
+    localStorage.setItem("dataVersion", "v2.0");
+  };
+
+  // Automation Operations
+  const updateReminderRule = (label, channels) => {
+    setReminderRules(
+      reminderRules.map((rule) =>
+        rule.label === label ? { ...rule, channels } : rule
+      )
+    );
+  };
+
+  const updateReminderTemplate = (type, content) => {
+    setReminderTemplates({ ...reminderTemplates, [type]: content });
+  };
+
+  // Organization & Admin Operations
+  const updateOrganizationInfo = (updates) => {
+    setOrganizationInfo({ ...organizationInfo, ...updates });
+  };
+
+  // Admin CRUD Operations - Using MongoDB API
+  const addAdminUser = async (user) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/admins`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: user.name,
+          email: user.email || '',
+          role: user.role || 'Viewer',
+          status: user.status || 'Active',
+          password: user.password || ''
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to create admin');
+      }
+      const newAdmin = await response.json();
+      setAdmins([...admins, newAdmin]);
+      await fetchAdmins(); // Refresh to get latest data
+      return newAdmin;
+    } catch (error) {
+      console.error('Error adding admin:', error);
+      throw error;
+    }
+  };
+
+  const updateAdminUser = async (id, updates) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/admins/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to update admin');
+      }
+      const updatedAdmin = await response.json();
+      setAdmins(admins.map((admin) => (admin.id === id ? updatedAdmin : admin)));
+      await fetchAdmins(); // Refresh to get latest data
+      return updatedAdmin;
+    } catch (error) {
+      console.error('Error updating admin:', error);
+      throw error;
+    }
+  };
+
+  const deleteAdminUser = async (id) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/admins/${id}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to delete admin');
+      }
+      setAdmins(admins.filter((admin) => admin.id !== id));
+      await fetchAdmins(); // Refresh to get latest data
+    } catch (error) {
+      console.error('Error deleting admin:', error);
+      throw error;
+    }
+  };
+
+  // Donation Operations
+  const addDonation = async (donation) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/donations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(donation),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to add donation');
+      }
+      
+      const newDonation = await response.json();
+      setDonations([newDonation, ...donations]);
+      console.log('✓ Donation added to server:', newDonation);
+      return newDonation;
+    } catch (error) {
+      console.error('Error adding donation:', error);
+      throw error;
+    }
+  };
+
+  const deleteDonation = async (id) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/donations/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to delete donation');
+      }
+      
+      setDonations(donations.filter(d => d._id !== id));
+      console.log('✓ Donation deleted from server:', id);
+    } catch (error) {
+      console.error('Error deleting donation:', error);
+      throw error;
+    }
+  };
+
+  // Expense Operations
+  const addExpense = async (expense) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/expenses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(expense),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to add expense');
+      }
+      
+      const newExpense = await response.json();
+      setExpenses([newExpense, ...expenses]);
+      console.log('✓ Expense added to server:', newExpense);
+      return newExpense;
+    } catch (error) {
+      console.error('Error adding expense:', error);
+      throw error;
+    }
+  };
+
+  const updateExpense = async (id, expense) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/expenses/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(expense),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update expense');
+      }
+      
+      const updatedExpense = await response.json();
+      setExpenses(expenses.map(exp => exp._id === id ? updatedExpense : exp));
+      console.log('✓ Expense updated on server:', updatedExpense);
+      return updatedExpense;
+    } catch (error) {
+      console.error('Error updating expense:', error);
+      throw error;
+    }
+  };
+
+  const deleteExpense = async (id) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/expenses/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to delete expense');
+      }
+      
+      setExpenses(expenses.filter(exp => exp._id !== id));
+      console.log('✓ Expense deleted from server:', id);
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      throw error;
+    }
+  };
+
+  const value = {
+    members,
+    invoices,
+    payments,
+    donations,
+    expenses,
+    loading,
+    fetchMembers,
+    fetchAdmins,
+    fetchInvoices,
+    fetchPayments,
+    fetchDonations,
+    fetchExpenses,
+    fetchPaymentMethods,
+    fetchReminderLogs,
+    fetchPasswordResetRequests,
+    recentPayments,
+    paymentHistory,
+    communicationLog,
+    reminderLogs,
+    passwordResetRequests,
+    paymentMethods,
+    metrics,
+    reminderRules,
+    automationEnabled,
+    setAutomationEnabled,
+    reminderTemplates,
+    organizationInfo,
+    admins,
+    selectedMember,
+    setSelectedMember,
+    addMember,
+    updateMember,
+    deleteMember,
+    addInvoice,
+    updateInvoice,
+    deleteInvoice,
+    addPayment,
+    addDonation,
+    deleteDonation,
+    addExpense,
+    updateExpense,
+    deleteExpense,
+    addCommunication,
+    updatePaymentMethod,
+    updateMetrics,
+    updateReminderRule,
+    updateReminderTemplate,
+    updateOrganizationInfo,
+    userLocale,
+    updateUserLocale,
+    addAdminUser,
+    updateAdminUser,
+    deleteAdminUser,
+    resetAllData,
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+}
+
+export function useApp() {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error("useApp must be used within AppProvider");
+  }
+  return context;
+}
+
