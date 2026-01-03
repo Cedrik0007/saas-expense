@@ -140,26 +140,27 @@ export function LoginPage() {
           return;
         }
 
-        // Store auth token and user info
-        sessionStorage.setItem('authToken', data.token);
+        // Store auth token and user info - batch all sessionStorage writes
+        const sessionData = {
+          'authToken': data.token,
+        };
         
         if (data.role === "Admin") {
-          sessionStorage.setItem('adminEmail', data.email);
-          sessionStorage.setItem('adminName', data.name);
-          if (data.adminId) {
-            sessionStorage.setItem('adminId', data.adminId);
-          }
-          if (data.adminRole) {
-            sessionStorage.setItem('adminRole', data.adminRole);
-          }
-          if (data.organization_id) {
-            sessionStorage.setItem('organization_id', data.organization_id);
-          }
+          sessionData['adminEmail'] = data.email;
+          sessionData['adminName'] = data.name;
+          if (data.adminId) sessionData['adminId'] = data.adminId;
+          if (data.adminRole) sessionData['adminRole'] = data.adminRole;
+          if (data.organization_id) sessionData['organization_id'] = data.organization_id;
           
-          // Clear loading state before navigation
+          // Batch write to sessionStorage for better performance
+          Object.entries(sessionData).forEach(([key, value]) => {
+            sessionStorage.setItem(key, value);
+          });
+          
+          // Clear loading state and navigate immediately
           setLoadingRole(null);
           
-          // Instant redirect - no delay
+          // Instant redirect - no delay, no await
           navigate("/admin", {
             replace: true,
             state: {
@@ -174,14 +175,19 @@ export function LoginPage() {
           });
         } else {
           // Member login
-          sessionStorage.setItem('memberEmail', data.email);
-          sessionStorage.setItem('memberName', data.name);
-          sessionStorage.setItem('memberId', data.memberId);
+          sessionData['memberEmail'] = data.email;
+          sessionData['memberName'] = data.name;
+          sessionData['memberId'] = data.memberId;
           
-          // Clear loading state before navigation
+          // Batch write to sessionStorage for better performance
+          Object.entries(sessionData).forEach(([key, value]) => {
+            sessionStorage.setItem(key, value);
+          });
+          
+          // Clear loading state and navigate immediately
           setLoadingRole(null);
           
-          // Instant redirect - no delay
+          // Instant redirect - no delay, no await
           navigate("/member", {
             replace: true,
             state: {

@@ -25,7 +25,7 @@ export function AppProvider({ children }) {
   const [payments, setPayments] = useState([]);
   const [donations, setDonations] = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start as false for instant page render
 
   const [recentPayments, setRecentPayments] = useState(() => {
     const saved = localStorage.getItem("recentPayments");
@@ -319,36 +319,27 @@ export function AppProvider({ children }) {
   // Fetch data on mount - moved after function definitions
   useEffect(() => {
     // Fetch data in background without blocking page render
-    // This improves perceived performance - page shows immediately
+    // Page shows immediately, data loads in background
     const fetchAllData = async () => {
+      // Don't set loading to true - keep page instantly accessible
       try {
-        // Fetch critical data first (members, admins, invoices)
-        const criticalFetches = Promise.allSettled([
+        // Fetch all data in parallel for fastest loading
+        await Promise.allSettled([
           fetchMembers(),
           fetchAdmins(),
           fetchInvoices(),
-        ]);
-        
-        // Then fetch remaining data
-        const remainingFetches = Promise.allSettled([
           fetchPayments(),
           fetchDonations(),
           fetchPaymentMethods(),
           fetchReminderLogs(),
         ]);
-        
-        // Wait for all but don't block render
-        await Promise.allSettled([criticalFetches, remainingFetches]);
-        // Set loading to false after data fetching completes
-        setLoading(false);
       } catch (error) {
         console.error('Error fetching initial data:', error);
-        // Set loading to false even on error so page can render
-        setLoading(false);
+        // Continue even if some fetches fail
       }
     };
     
-    // Start fetching immediately but don't block
+    // Start fetching immediately but don't block render
     fetchAllData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps - only run once on mount
