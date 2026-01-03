@@ -7668,7 +7668,8 @@ Subscription Manager HK`;
 
                 {/* Filters Section */}
                 <div className="expense-filters-section">
-                  <div className="expense-filters-grid">
+                  {/* Desktop Filters Grid */}
+                  <div className="expense-filters-grid expense-filters-desktop">
                     {/* Category Filter */}
                     <label>
                       <span className="expense-filter-label">
@@ -7746,6 +7747,103 @@ Subscription Manager HK`;
                         placeholder="Search by description..."
                       />
                     </label>
+                  </div>
+
+                  {/* Mobile Filters - Button/Chip Style */}
+                  <div className="expense-filters-mobile">
+                    {/* Category Filter - Mobile */}
+                    <div className="expense-filter-group-mobile">
+                      <label className="expense-filter-group-label">
+                        <i className="fas fa-filter" style={{ marginRight: "6px", color: "#5a31ea" }}></i>
+                        Category:
+                      </label>
+                      <div className="expense-filter-chips">
+                        <button
+                          type="button"
+                          className={`expense-filter-chip ${expenseCategoryFilter === "All" ? "active" : ""}`}
+                          onClick={() => setExpenseCategoryFilter("All")}
+                        >
+                          All
+                        </button>
+                        {expenseCategories.map((category) => (
+                          <button
+                            key={category.id}
+                            type="button"
+                            className={`expense-filter-chip ${expenseCategoryFilter === category.id ? "active" : ""}`}
+                            onClick={() => setExpenseCategoryFilter(category.id)}
+                          >
+                            {category.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Payment Mode Filter - Mobile */}
+                    <div className="expense-filter-group-mobile">
+                      <label className="expense-filter-group-label">
+                        <i className="fas fa-credit-card" style={{ marginRight: "6px", color: "#5a31ea" }}></i>
+                        Payment Mode:
+                      </label>
+                      <div className="expense-filter-chips">
+                        {[
+                          { value: "All", label: "All" },
+                          { value: "Cash", label: "Cash" },
+                          { value: "Bank Transfer", label: "Bank Transfer" },
+                          { value: "UPI", label: "UPI" },
+                          { value: "Card", label: "Card" },
+                          { value: "Cheque", label: "Cheque" }
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={`expense-filter-chip ${expensePaymentModeFilter === option.value ? "active" : ""}`}
+                            onClick={() => setExpensePaymentModeFilter(option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Date Range - Mobile */}
+                    <div className="expense-filter-group-mobile expense-date-range-mobile">
+                      <label className="expense-filter-group-label">
+                        <i className="fas fa-calendar" style={{ marginRight: "6px", color: "#5a31ea" }}></i>
+                        Date Range:
+                      </label>
+                      <div className="expense-date-inputs-mobile">
+                        <input
+                          type="date"
+                          className="expense-filter-input-mobile"
+                          value={expenseDateRange.from}
+                          onChange={(e) => setExpenseDateRange({ ...expenseDateRange, from: e.target.value })}
+                          placeholder="From"
+                        />
+                        <span className="expense-date-separator">to</span>
+                        <input
+                          type="date"
+                          className="expense-filter-input-mobile"
+                          value={expenseDateRange.to}
+                          onChange={(e) => setExpenseDateRange({ ...expenseDateRange, to: e.target.value })}
+                          placeholder="To"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Search - Mobile */}
+                    <div className="expense-filter-group-mobile">
+                      <label className="expense-filter-group-label">
+                        <i className="fas fa-search" style={{ marginRight: "6px", color: "#5a31ea" }}></i>
+                        Search:
+                      </label>
+                      <input
+                        type="text"
+                        className="expense-filter-input-mobile"
+                        value={expenseSearchTerm}
+                        onChange={(e) => setExpenseSearchTerm(e.target.value)}
+                        placeholder="Search by description..."
+                      />
+                    </div>
                   </div>
 
                   {/* Clear Filters Button */}
@@ -13128,7 +13226,7 @@ Subscription Manager HK`;
 
                 {/* Date Range Selector - Modern Design */}
                 {/* STEP 8: Role-Based Visibility - Viewers can see but cannot edit filters */}
-                <div className="card card-reports" style={{ marginBottom: "24px", padding: "20px", background: "#ffffff" }}>
+                <div className="card card-reports financial-reports-date-range" style={{ marginBottom: "24px", padding: "20px", background: "#ffffff" }}>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "flex-end" }}>
                     <div style={{ flex: "1", minWidth: "200px" }}>
                       <label style={{ display: "block", marginBottom: "8px", fontSize: "0.875rem", fontWeight: "600", color: "#374151" }}>
@@ -13473,7 +13571,7 @@ Subscription Manager HK`;
                   </div>
 
                 {/* Payment Method Breakdown - Enhanced */}
-                <div className="card card-reports" style={{ 
+                <div className="card card-reports payment-method-breakdown" style={{ 
                   marginBottom: "24px", 
                   padding: "24px",
                   background: "#ffffff",
@@ -13537,13 +13635,13 @@ Subscription Manager HK`;
                 </div>
 
                 {/* Filters and Transactions Section */}
-                <div className="card card-reports" style={{ 
+                <div className="card card-reports financial-reports-filters" style={{ 
                   padding: "24px",
                   background: "#ffffff",
                   border: "1px solid #e5e7eb"
                 }}>
                   {/* Filters - STEP 8: Disabled for Viewers */}
-                  <div style={{ marginBottom: "24px", display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center" }}>
+                  <div className="financial-reports-filter-buttons" style={{ marginBottom: "24px", display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center" }}>
                     <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
                       <label style={{ fontWeight: "600", color: "#1a1a1a", fontSize: "0.9375rem" }}>
                         <i className="fas fa-filter" style={{ marginRight: "6px", color: "#5a31ea" }}></i>

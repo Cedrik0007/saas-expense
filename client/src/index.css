@@ -4872,6 +4872,16 @@ button[disabled] {
     align-items: stretch;
     gap: 12px;
   }
+
+  /* Hide Financial Reports Date Range under 768px */
+  .financial-reports-date-range {
+    display: none !important;
+  }
+
+  /* Hide Financial Reports Filter Buttons under 768px */
+  .financial-reports-filter-buttons {
+    display: none !important;
+  }
   
   .chip-group {
     width: 100%;
@@ -5533,7 +5543,7 @@ button[disabled] {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    padding: 80px !important;
+    padding: 30px !important;
     animation: fadeIn 0.2s ease !important;
   }
   
@@ -6511,6 +6521,117 @@ button[disabled] {
   table td:last-child > div {
     max-width: 100%;
     overflow: hidden;
+  }
+
+  /* Expense Filters - 480px */
+  .expense-filters-section {
+    padding: 12px !important;
+  }
+
+  .expense-filter-group-mobile {
+    margin-bottom: 12px !important;
+  }
+
+  .expense-filter-group-label {
+    font-size: 0.8125rem !important;
+    margin-bottom: 6px !important;
+  }
+
+  .expense-filter-chip {
+    padding: 6px 12px !important;
+    font-size: 0.75rem !important;
+    min-width: 60px !important;
+  }
+
+  .expense-date-inputs-mobile {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .expense-date-separator {
+    display: none !important;
+  }
+
+  .expense-filter-input-mobile {
+    width: 100% !important;
+    min-width: 100% !important;
+    padding: 8px 10px !important;
+    font-size: 0.75rem !important;
+  }
+
+  .expense-filter-clear-btn {
+    padding: 8px 12px !important;
+    font-size: 0.8125rem !important;
+    width: 100% !important;
+    margin-top: 8px !important;
+  }
+
+  /* Expense Table Section - 480px */
+  .expense-table-section {
+    padding: 12px !important;
+  }
+
+  /* Expense Form Modal - 480px */
+  .admin-members-form-container .expense-form-label {
+    font-size: 0.75rem !important;
+    margin-bottom: 6px !important;
+  }
+
+  .admin-members-form-container .expense-form-label i {
+    font-size: 0.875rem !important;
+  }
+
+  .admin-members-form-container .expense-form-input,
+  .admin-members-form-container .expense-form-select,
+  .admin-members-form-container .expense-form-textarea {
+    padding: 8px 10px !important;
+    font-size: 0.8125rem !important;
+  }
+
+  .admin-members-form-container .expense-form-actions {
+    gap: 10px !important;
+    margin-top: 16px !important;
+  }
+
+  .admin-members-form-container .expense-form-actions button {
+    padding: 10px 14px !important;
+    font-size: 0.8125rem !important;
+  }
+
+  .expense-upload-area {
+    padding: 16px 12px !important;
+  }
+
+  .expense-upload-preview-img {
+    max-height: 120px !important;
+  }
+
+  .expense-upload-icon {
+    font-size: 1.25rem !important;
+  }
+
+  .expense-upload-text {
+    font-size: 0.75rem !important;
+  }
+
+  .expense-upload-hint {
+    font-size: 0.6875rem !important;
+  }
+
+  .expense-upload-file-name {
+    font-size: 0.75rem !important;
+  }
+
+  .expense-upload-remove-btn {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 0.75rem !important;
+  }
+
+  .expense-upload-remove-file-btn {
+    padding: 6px 12px !important;
+    font-size: 0.75rem !important;
   }
 
   /* Filters and chips - 480px */
@@ -10185,7 +10306,7 @@ button[disabled] {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    padding: 80px !important;
+    padding: 30px !important;
     animation: fadeIn 0.2s ease !important;
   }
 
@@ -10208,7 +10329,7 @@ button[disabled] {
     overflow-y: auto !important;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2) !important;
     animation: scaleIn 0.3s ease !important;
-    padding: 20px  !important;
+    padding: 30px  !important;
     -webkit-overflow-scrolling: touch !important;
   }
 
@@ -10594,7 +10715,7 @@ button[disabled] {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    padding: 80px !important;
+    padding: 30px !important;
     animation: fadeIn 0.2s ease !important;
   }
 
@@ -10609,7 +10730,7 @@ button[disabled] {
     overflow-y: auto !important;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2) !important;
     animation: scaleIn 0.3s ease !important;
-    padding: 20px  !important;
+    padding: 30px  !important;
     -webkit-overflow-scrolling: touch !important;
   }
 
@@ -10740,6 +10861,111 @@ button[disabled] {
   }
   .admin-members-form-close{
     display:none;
+  }
+
+  /* Expense Filters - 768px */
+  .expense-filters-section {
+    display: none !important;
+  }
+
+  .expense-filter-group-mobile {
+    margin-bottom: 16px;
+  }
+
+  .expense-filter-group-label {
+    font-size: 0.875rem !important;
+    margin-bottom: 8px !important;
+  }
+
+  .expense-filter-chips {
+    gap: 4px !important;
+    padding: 4px !important;
+  }
+
+  .expense-filter-chip {
+    padding: 8px 14px !important;
+    font-size: 0.8125rem !important;
+    flex: 1;
+    min-width: 70px;
+  }
+
+  .expense-date-inputs-mobile {
+    gap: 8px !important;
+  }
+
+  .expense-date-separator {
+    font-size: 0.8125rem !important;
+  }
+
+  .expense-filter-input-mobile {
+    padding: 10px 12px !important;
+    font-size: 0.8125rem !important;
+    min-width: 100px !important;
+  }
+
+  .expense-filter-label {
+    font-size: 0.8125rem !important;
+    margin-bottom: 6px !important;
+  }
+
+  .expense-filter-input,
+  .expense-filter-select {
+    padding: 10px 12px !important;
+    font-size: 0.875rem !important;
+  }
+
+  .expense-filter-clear-btn {
+    width: 100% !important;
+    margin-top: 8px !important;
+    padding: 10px 16px !important;
+    font-size: 0.875rem !important;
+  }
+
+  /* Expense Table Section - 768px */
+  .expense-table-section {
+    padding: 2px !important;
+  }
+
+  /* Expense Form Modal - 768px */
+  .admin-members-form-container .expense-form-label {
+    font-size: 0.8125rem !important;
+    margin-bottom: 8px !important;
+  }
+
+  .admin-members-form-container .expense-form-input,
+  .admin-members-form-container .expense-form-select,
+  .admin-members-form-container .expense-form-textarea {
+    padding: 10px 12px !important;
+    font-size: 0.875rem !important;
+  }
+
+  .admin-members-form-container .expense-form-actions {
+    flex-direction: column-reverse !important;
+    gap: 12px !important;
+    margin-top: 20px !important;
+  }
+
+  .admin-members-form-container .expense-form-actions button {
+    width: 100% !important;
+    padding: 12px 16px !important;
+    font-size: 0.875rem !important;
+  }
+
+  .expense-upload-area {
+    padding: 20px 16px !important;
+  }
+
+  .expense-upload-preview-img {
+    max-height: 150px !important;
+  }
+
+  .expense-upload-icon {
+    font-size: 1.5rem !important;
+  }
+
+  .expense-upload-text,
+  .expense-upload-hint {
+    font-size: 0.8125rem !important;
   }
 
   /* Individual mobile card */
@@ -11259,6 +11485,11 @@ button[disabled] {
 .mt-2xl { margin-top: var(--spacing-2xl); }
 .p-md { padding: var(--spacing-md); }
 
+/* Hide Payment Method Breakdown on all screens */
+.payment-method-breakdown {
+  display: none !important;
+}
+
 /* Expense Module Styles */
 .expense-filters-section {
   padding: var(--spacing-xl);
@@ -11270,6 +11501,93 @@ button[disabled] {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--spacing-lg);
   margin-bottom: var(--spacing-lg);
+}
+
+/* Mobile Filters - Hidden by default */
+.expense-filters-mobile {
+  display: none;
+}
+
+/* Mobile Filter Groups */
+.expense-filter-group-mobile {
+  margin-bottom: var(--spacing-lg);
+}
+
+.expense-filter-group-label {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: #1a1a1a;
+  font-size: 0.9375rem;
+  margin-bottom: 8px;
+}
+
+.expense-filter-chips {
+  display: flex;
+  gap: 4px;
+  background: #f3f4f6;
+  padding: 4px;
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.expense-filter-chip {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.expense-filter-chip:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.expense-filter-chip.active {
+  background: #5a31ea;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(90, 49, 234, 0.3);
+}
+
+.expense-date-range-mobile {
+  margin-bottom: var(--spacing-lg);
+}
+
+.expense-date-inputs-mobile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.expense-date-separator {
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.expense-filter-input-mobile {
+  flex: 1;
+  min-width: 120px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+  color: #1a1a1a;
+  background: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.expense-filter-input-mobile:focus {
+  outline: none;
+  border-color: #5a31ea;
+  box-shadow: 0 0 0 3px rgba(90, 49, 234, 0.1);
 }
 
 .expense-filter-label {
