@@ -247,10 +247,7 @@ export const paymentHistory = [
   { date: "02 Apr 2025", amount: "$100", method: "Bank Transfer", reference: "BT44881" },
 ];
 
-export const communicationLog = [
-  { channel: "Email", message: "Upcoming due reminder", status: "Delivered", date: "02 Oct 2025" },
-  { channel: "WhatsApp", message: "Overdue alert", status: "Pending", date: "01 Oct 2025" },
-];
+export const communicationLog = [];
 
 export const reminderRules = [
   { label: "3 days before due date", channels: ["Email", "WhatsApp"] },

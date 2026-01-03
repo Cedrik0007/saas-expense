@@ -39,7 +39,9 @@ export function AppProvider({ children }) {
 
   const [communicationLog, setCommunicationLog] = useState(() => {
     const saved = localStorage.getItem("communicationLog");
-    return saved ? JSON.parse(saved) : initialCommunicationLog;
+    const parsed = saved ? JSON.parse(saved) : [];
+    // Filter out any dummy data (items without memberId or memberEmail)
+    return Array.isArray(parsed) ? parsed.filter(c => c.memberId || c.memberEmail) : [];
   });
 
   // Reminder logs from backend (automatic + manual email reminders)

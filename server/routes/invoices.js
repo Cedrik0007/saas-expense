@@ -5,6 +5,7 @@ import { calculateAndUpdateMemberBalance } from "../utils/balance.js";
 import { generateSubscriptionInvoices } from "../services/invoiceService.js";
 import EmailSettingsModel from "../models/EmailSettings.js";
 import EmailTemplateModel from "../models/EmailTemplate.js";
+import ReminderLogModel from "../models/ReminderLog.js";
 import { generateUniqueMessageId } from "../config/email.js";
 import nodemailer from "nodemailer";
 
@@ -184,12 +185,53 @@ router.post("/send-reminder", async (req, res) => {
 
     console.log(`✓ Invoice reminder email sent to ${toEmail}`);
 
+    // Save reminder log to database
+    try {
+      // Get member's invoices to determine reminder type
+      const memberInvoices = memberId ? await InvoiceModel.find({ 
+        memberId: memberId,
+        status: { $in: ['Unpaid', 'Overdue'] }
+      }) : [];
+      
+      const reminderType = memberInvoices.some(inv => inv.status === 'Overdue') ? 'overdue' : 'upcoming';
+      
+      await ReminderLogModel.create({
+        memberId: memberId || null,
+        memberEmail: toEmail,
+        sentAt: new Date(),
+        reminderType: reminderType,
+        amount: totalDue || '$0',
+        invoiceCount: invoiceCount || 0,
+        status: "Delivered",
+      });
+      console.log(`✓ Reminder log saved to database for ${toEmail}`);
+    } catch (logError) {
+      console.error("Error saving reminder log:", logError);
+      // Don't fail the request if log save fails
+    }
+
     res.json({ 
       success: true, 
       message: `Email sent successfully to ${toEmail}` 
     });
   } catch (error) {
     console.error("Error sending invoice reminder email:", error);
+    
+    // Save failed reminder log to database
+    try {
+      await ReminderLogModel.create({
+        memberId: req.body.memberId || null,
+        memberEmail: req.body.toEmail || null,
+        sentAt: new Date(),
+        reminderType: 'upcoming',
+        amount: req.body.totalDue || '$0',
+        invoiceCount: req.body.invoiceCount || 0,
+        status: "Failed",
+      });
+    } catch (logError) {
+      console.error("Error saving failed reminder log:", logError);
+    }
+    
     res.status(500).json({ error: error.message });
   }
 });

@@ -30,7 +30,10 @@ const PORT = process.env.PORT || 4000;
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? "https://subs-manager.vercel.app"
+    ? [
+        "https://subs-manager.vercel.app",
+        "https://saas-expense-theta.vercel.app"
+      ]
     : ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true

@@ -2588,8 +2588,29 @@ Subscription Manager HK`;
         const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 
         // Open WhatsApp with delay between each
-        setTimeout(() => {
+        setTimeout(async () => {
           window.open(whatsappUrl, '_blank');
+          
+          // Save WhatsApp reminder to database
+          try {
+            const apiUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+            await fetch(`${apiUrl}/api/reminders/log-whatsapp`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                memberId: member.id,
+                memberEmail: member.email,
+                memberName: member.name,
+                amount: `$${totalDue.toFixed(2)}`,
+                invoiceCount: memberUnpaidInvoices.length,
+                reminderType: memberUnpaidInvoices.some(inv => inv.status === 'Overdue') ? 'overdue' : 'upcoming',
+                status: "Delivered",
+              }),
+            });
+          } catch (error) {
+            console.error("Error saving WhatsApp reminder log:", error);
+            // Continue even if log save fails
+          }
           
           // Log to communication with member metadata
           const comm = {
@@ -3852,7 +3873,7 @@ Subscription Manager HK`;
   };
 
   // WhatsApp Reminder (Click-to-Chat)
-  const handleSendWhatsAppReminder = (memberData) => {
+  const handleSendWhatsAppReminder = async (memberData) => {
     if (!memberData) {
       showToast("No member selected", "error");
       return;
@@ -3932,6 +3953,27 @@ Subscription Manager HK`;
     window.open(whatsappUrl, '_blank');
 
     // Log to communication with member metadata
+    // Save WhatsApp reminder to database
+    try {
+      const apiUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+      await fetch(`${apiUrl}/api/reminders/log-whatsapp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberId: memberData.id,
+          memberEmail: memberData.email,
+          memberName: memberData.name,
+          amount: `$${totalDue.toFixed(2)}`,
+          invoiceCount: memberUnpaidInvoices.length,
+          reminderType: memberUnpaidInvoices.some(inv => inv.status === 'Overdue') ? 'overdue' : 'upcoming',
+          status: "Delivered",
+        }),
+      });
+    } catch (error) {
+      console.error("Error saving WhatsApp reminder log:", error);
+      // Continue even if log save fails
+    }
+
     const comm = {
       channel: "WhatsApp",
       type: "Manual Outstanding Reminder",
@@ -4032,7 +4074,7 @@ Subscription Manager HK`;
       if (channel === 'Email') {
         await handleSendReminder(pendingReminderAction.memberData);
       } else if (channel === 'WhatsApp') {
-        handleSendWhatsAppReminder(pendingReminderAction.memberData);
+        await handleSendWhatsAppReminder(pendingReminderAction.memberData);
       }
     } else if (pendingReminderAction?.memberId) {
       // Handle manual reminder by memberId
@@ -4041,7 +4083,7 @@ Subscription Manager HK`;
       } else if (channel === 'WhatsApp') {
         const member = members.find(m => m.id === pendingReminderAction.memberId);
         if (member) {
-          handleSendWhatsAppReminder(member);
+          await handleSendWhatsAppReminder(member);
         }
       }
     }
@@ -9005,8 +9047,15 @@ Subscription Manager HK`;
                     return { status: normalizedStatus };
                   });
 
+                  // Only show WhatsApp items that have valid member associations
                   const whatsappItems = (communicationLog || [])
-                    .filter((c) => c.channel === "WhatsApp")
+                    .filter((c) => {
+                      // Only include if it has a valid memberId or memberEmail that matches an actual member
+                      if (c.channel !== "WhatsApp") return false;
+                      if (c.memberId && members.some(m => m.id === c.memberId)) return true;
+                      if (c.memberEmail && members.some(m => m.email && m.email.toLowerCase() === c.memberEmail.toLowerCase())) return true;
+                      return false;
+                    })
                     .map((c) => {
                       // Normalize status - preserve original status values
                       const cStatus = c.status ? String(c.status).trim() : "";
@@ -9233,15 +9282,27 @@ Subscription Manager HK`;
                       };
                     });
 
+                    // Only show WhatsApp items that have valid member associations
                     const whatsappItems = (communicationLog || [])
-                      .filter((c) => c.channel === "WhatsApp")
+                      .filter((c) => {
+                        // Only include if it has a valid memberId or memberEmail that matches an actual member
+                        if (c.channel !== "WhatsApp") return false;
+                        if (c.memberId && members.some(m => m.id === c.memberId)) return true;
+                        if (c.memberEmail && members.some(m => m.email && m.email.toLowerCase() === c.memberEmail.toLowerCase())) return true;
+                        return false;
+                      })
                       .map((c) => {
+                        // Find the member to get accurate name
+                        const member = members.find(m => 
+                          m.id === c.memberId || 
+                          (m.email && c.memberEmail && m.email.toLowerCase() === c.memberEmail.toLowerCase())
+                        );
                         // Normalize status - preserve original status values
                         const cStatus = c.status ? String(c.status).trim() : "";
                         const normalizedStatus = cStatus || "Delivered";
                         return {
-                          memberName: c.memberName || c.member || "N/A",
-                          memberId: c.memberId,
+                          memberName: member?.name || c.memberName || c.member || "N/A",
+                          memberId: c.memberId || member?.id,
                           channel: "WhatsApp",
                           type: c.type || "Manual Outstanding Reminder",
                           message: c.message,
@@ -9299,8 +9360,15 @@ Subscription Manager HK`;
                         else if (logStatus) normalizedStatus = logStatus;
                         return { status: normalizedStatus, channel: "Email" };
                       });
+                      // Only count WhatsApp items that have valid member associations
                       const allWhatsappItems = (communicationLog || [])
-                        .filter((c) => c.channel === "WhatsApp")
+                        .filter((c) => {
+                          // Only include if it has a valid memberId or memberEmail that matches an actual member
+                          if (c.channel !== "WhatsApp") return false;
+                          if (c.memberId && members.some(m => m.id === c.memberId)) return true;
+                          if (c.memberEmail && members.some(m => m.email && m.email.toLowerCase() === c.memberEmail.toLowerCase())) return true;
+                          return false;
+                        })
                         .map((c) => ({ status: c.status || "Delivered", channel: "WhatsApp" }));
                       const totalUnfiltered = allEmailItems.length + allWhatsappItems.length;
                       
@@ -11758,6 +11826,9 @@ Subscription Manager HK`;
                         }
                         
                         try {
+                          // Calculate amountNum at the start to ensure it's always defined
+                          const amountNum = parseFloat(donationForm.amount) || 0;
+                          
                           // Upload image if file exists
                           let imageUrl = donationForm.screenshot;
                           if (donationImageFile) {

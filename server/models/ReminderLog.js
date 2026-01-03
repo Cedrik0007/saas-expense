@@ -12,7 +12,7 @@ const ReminderLogSchema = new mongoose.Schema({
   timestamps: true
 });
 
-const ReminderLogModel = mongoose.model("reminderlogs", ReminderLogSchema);
+const ReminderLogModel = mongoose.model("reminder-logs", ReminderLogSchema);
 
 export default ReminderLogModel;
 

@@ -189,5 +189,58 @@ router.get("/logs", async (req, res) => {
   }
 });
 
+// POST endpoint to save WhatsApp reminder log
+router.post("/log-whatsapp", async (req, res) => {
+  try {
+    await ensureConnection();
+    
+    const { 
+      memberId, 
+      memberEmail, 
+      memberName,
+      amount, 
+      invoiceCount,
+      reminderType,
+      status = "Delivered"
+    } = req.body;
+    
+    if (!memberId && !memberEmail) {
+      return res.status(400).json({ error: "memberId or memberEmail is required" });
+    }
+
+    // Get member's invoices to determine reminder type if not provided
+    let finalReminderType = reminderType || 'upcoming';
+    if (memberId) {
+      const memberInvoices = await InvoiceModel.find({ 
+        memberId: memberId,
+        status: { $in: ['Unpaid', 'Overdue'] }
+      });
+      if (memberInvoices.some(inv => inv.status === 'Overdue')) {
+        finalReminderType = 'overdue';
+      }
+    }
+
+    const reminderLog = await ReminderLogModel.create({
+      memberId: memberId || null,
+      memberEmail: memberEmail || null,
+      sentAt: new Date(),
+      reminderType: finalReminderType,
+      amount: amount || '$0',
+      invoiceCount: invoiceCount || 0,
+      status: status,
+    });
+
+    console.log(`✓ WhatsApp reminder log saved to database for ${memberEmail || memberId}`);
+    res.json({ 
+      success: true, 
+      message: "WhatsApp reminder log saved",
+      log: reminderLog
+    });
+  } catch (error) {
+    console.error("Error saving WhatsApp reminder log:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
 
