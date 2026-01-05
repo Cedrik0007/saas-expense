@@ -39,6 +39,8 @@ function AdminPage() {
     addMember,
     updateMember,
     deleteMember,
+    markPaymentAsPaid,
+    confirmSubscriptionPayment,
     addInvoice,
     updateInvoice,
     deleteInvoice,
@@ -227,6 +229,15 @@ function AdminPage() {
     confirmButtonText: "Confirm", // Default button text
   });
   
+  // Helper function to get today's date in YYYY-MM-DD format
+  const getTodayDateString = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Form states
   const [memberForm, setMemberForm] = useState({
     name: "",
@@ -234,8 +245,9 @@ function AdminPage() {
     phone: "",
     status: "Active",
     balance: "250", // default for Lifetime (numeric string)
-    nextDue: "",
-    lastPayment: "",
+    nextDue: getTodayDateString(),  // Initialize with today's date for validation
+    lastPayment: "",  // Keep for backward compatibility
+    start_date: getTodayDateString(),  // Default to today in YYYY-MM-DD format
     subscriptionType: "Lifetime",
   });
 
@@ -3564,15 +3576,29 @@ Subscription Manager HK`;
     try {
       setIsMemberSubmitting(true);
 
-      await addMember(memberForm);
+      // Prepare member data with start_date
+      const memberData = {
+        ...memberForm,
+        start_date: memberForm.start_date || memberForm.nextDue || (() => {
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        })(),
+      };
+
+      await addMember(memberData);
+      const todayDateReset = getTodayDateString();
       setMemberForm({
         name: "",
         email: "",
         phone: "",
         status: "Active",
         balance: "250",
-        nextDue: "",
+        nextDue: todayDateReset,
         lastPayment: "",
+        start_date: todayDateReset,
         subscriptionType: "Lifetime",
       });
       // Clear validation state
@@ -3702,6 +3728,17 @@ Subscription Manager HK`;
         }
       }
     );
+  };
+
+  const handleMarkPaymentAsPaid = async (memberId) => {
+    try {
+      await markPaymentAsPaid(memberId);
+      showToast("Payment marked as paid successfully!", "success");
+      await fetchMembers(); // Refresh members list
+    } catch (error) {
+      console.error("Failed to mark payment as paid:", error);
+      showToast(error.message || "Failed to mark payment as paid. Please try again.", "error");
+    }
   };
 
   // Invoice CRUD Operations
@@ -4824,14 +4861,16 @@ Subscription Manager HK`;
                           setShowMemberForm(true);
                           setEditingMember(null);
                           // Reset form with balance matching default subscription type
+                          const todayDate = getTodayDateString();
                           setMemberForm({
                             name: "",
                             email: "",
                             phone: "",
                             status: "Active",
                             balance: "250", // default based on Lifetime subscription
-                            nextDue: "",
+                            nextDue: todayDate,
                             lastPayment: "",
+                            start_date: todayDate,
                             subscriptionType: "Lifetime",
                           });
                         }}
@@ -5019,7 +5058,6 @@ Subscription Manager HK`;
                         >
                           <option>Active</option>
                           <option>Inactive</option>
-                          <option>Pending</option>
                         </select>
                       </label>
 
@@ -5067,9 +5105,11 @@ Subscription Manager HK`;
                           </span>
                           <input
                             type="date"
-                            value={memberForm.nextDue}
+                            value={memberForm.start_date || memberForm.nextDue || ""}
                             onChange={(e) => {
                               const selectedDate = e.target.value;
+                              handleMemberFieldChange("start_date", selectedDate);
+                              // Also update nextDue for backward compatibility
                               handleMemberFieldChange("nextDue", selectedDate);
                               // Clear error when user starts typing
                               if (memberFieldErrors.nextDue || currentInvalidField === "nextDue") {
@@ -5426,8 +5466,7 @@ Subscription Manager HK`;
                                     { value: "All", label: "All" },
                                     { value: "Active", label: "Active" },
                                     { value: "Overdue", label: "Overdue" },
-                                    { value: "Inactive", label: "Inactive" },
-                                    { value: "Pending", label: "Pending" }
+                                    { value: "Inactive", label: "Inactive" }
                                   ].map((option) => (
                                     <button
                                       key={option.value}
@@ -5764,14 +5803,69 @@ Subscription Manager HK`;
                         <i className="fas fa-calendar-day admin-dashboard-kpi-icon"></i>
                         Next Due Date
                       </p>
-                      <h4 className="admin-dashboard-kpi-value">{selectedMember.nextDue}</h4>
+                      <h4 className="admin-dashboard-kpi-value">
+                        {(() => {
+                          // If payment_status is unpaid, show N/A
+                          if (selectedMember.payment_status === "unpaid" || !selectedMember.payment_status) {
+                            return "N/A";
+                          }
+                          // Use next_due_date if available and payment is paid
+                          if (selectedMember.next_due_date) {
+                            const date = new Date(selectedMember.next_due_date);
+                            if (!isNaN(date.getTime())) {
+                              return date.toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                              });
+                            }
+                          }
+                          // Fallback to nextDue if it exists and payment is paid
+                          if (selectedMember.nextDue && selectedMember.payment_status === "paid") {
+                            return selectedMember.nextDue;
+                          }
+                          return "N/A";
+                        })()}
+                      </h4>
                     </div>
                     <div className="admin-dashboard-kpi-card">
                       <p className="admin-dashboard-kpi-label">
                         <i className="fas fa-dollar-sign admin-dashboard-kpi-icon--green"></i>
                         Last Payment
                       </p>
-                      <h4 className="admin-dashboard-kpi-value">{selectedMember.lastPayment}</h4>
+                      <h4 className="admin-dashboard-kpi-value">
+                        {(() => {
+                          // Use last_payment_date if available, otherwise fallback to lastPayment
+                          if (selectedMember.last_payment_date) {
+                            const date = new Date(selectedMember.last_payment_date);
+                            if (!isNaN(date.getTime())) {
+                              return date.toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                              });
+                            }
+                          }
+                          // Fallback to lastPayment if it exists
+                          if (selectedMember.lastPayment) {
+                            return selectedMember.lastPayment;
+                          }
+                          // Fallback: try to get from payment history
+                          const memberPayments = (paymentHistory || []).filter(p => 
+                            (p.memberId === selectedMember.id || p.memberEmail === selectedMember.email) &&
+                            (p.status === "Completed" || p.status === "Paid")
+                          );
+                          if (memberPayments.length > 0) {
+                            const sortedPayments = memberPayments.sort((a, b) => {
+                              const dateA = a.date ? new Date(a.date) : new Date(0);
+                              const dateB = b.date ? new Date(b.date) : new Date(0);
+                              return dateB - dateA; // Most recent first
+                            });
+                            return sortedPayments[0]?.date || "N/A";
+                          }
+                          return "N/A";
+                        })()}
+                      </h4>
                     </div>
                     <div className="admin-dashboard-kpi-card">
                       <p className="admin-dashboard-kpi-label">
@@ -5913,7 +6007,7 @@ Subscription Manager HK`;
                           "Period",
                           "Amount",
                           "Status",
-                          "Due Date",
+                          "Next Due Date",
                           "Actions",
                         ]}
                         rows={getMemberInvoices(selectedMember.id).map((invoice) => {
@@ -5934,7 +6028,30 @@ Subscription Manager HK`;
                               </span>
                             ),
                           },
-                          "Due Date": invoice.due,
+                          "Next Due Date": {
+                            render: () => {
+                              // If payment_status is unpaid, show N/A
+                              if (selectedMember.payment_status === "unpaid" || !selectedMember.payment_status) {
+                                return <span style={{ color: "#6b7280" }}>N/A</span>;
+                              }
+                              // Use next_due_date if available and payment is paid
+                              if (selectedMember.next_due_date) {
+                                const date = new Date(selectedMember.next_due_date);
+                                if (!isNaN(date.getTime())) {
+                                  return date.toLocaleDateString('en-GB', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric'
+                                  });
+                                }
+                              }
+                              // Fallback to nextDue if it exists and payment is paid
+                              if (selectedMember.nextDue && selectedMember.payment_status === "paid") {
+                                return selectedMember.nextDue;
+                              }
+                              return <span style={{ color: "#6b7280" }}>N/A</span>;
+                            },
+                          },
                           Screenshot: invoice.screenshot ? {
                             render: () => (
                               <button
@@ -15251,9 +15368,26 @@ Subscription Manager HK`;
                             });
                           }
 
-                          // Mark invoice as paid
+                          // Mark invoice as paid (for invoice tracking)
                           const paymentMethod = paymentModalData.paymentMethod === "Admin" ? "Cash" : "Online";
                           await handleMarkAsPaid(paymentModalInvoice.id, paymentMethod, imageUrl, null);
+
+                          // Confirm subscription payment (updates member payment_status, payment_mode, payment_proof, last_payment_date, next_due_date)
+                          if (selectedMember) {
+                            const paymentMode = paymentModalData.paymentMethod === "Admin" ? "cash" : "online";
+                            await confirmSubscriptionPayment(selectedMember.id, paymentMode, imageUrl);
+                            
+                            // Refresh member data to get updated payment_status and next_due_date
+                            await fetchMembers();
+                            
+                            // Update selectedMember with latest data
+                            const apiUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+                            const memberResponse = await fetch(`${apiUrl}/api/members/${selectedMember.id}`);
+                            if (memberResponse.ok) {
+                              const latestMember = await memberResponse.json();
+                              setSelectedMember(latestMember);
+                            }
+                          }
 
                           // Close modal and reset
                           setShowPaymentModal(false);
@@ -15270,7 +15404,7 @@ Subscription Manager HK`;
                           setPaymentModalErrors({ image: false, reference: false, selectedAdminId: false, adminMobile: false });
                     setCurrentInvalidPaymentModalField(null);
 
-                          showToast(`Invoice #${paymentModalInvoice.id} marked as paid!`, "success");
+                          showToast(`Invoice #${paymentModalInvoice.id} marked as paid! Subscription payment confirmed.`, "success");
                         } catch (error) {
                           console.error("Error processing payment:", error);
                           showToast(error.message || "Failed to process payment", "error");

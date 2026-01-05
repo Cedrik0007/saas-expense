@@ -433,6 +433,52 @@ export function AppProvider({ children }) {
     }
   };
 
+  const markPaymentAsPaid = async (memberId) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/members/${memberId}/mark-paid`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || 'Failed to mark payment as paid');
+      }
+      const result = await response.json();
+      const updatedMember = result.member || result;
+      setMembers(members.map((m) => (m.id === memberId ? updatedMember : m)));
+      console.log('✓ Payment marked as paid for member:', memberId);
+      return updatedMember;
+    } catch (error) {
+      console.error('Error marking payment as paid:', error);
+      throw error;
+    }
+  };
+
+  const confirmSubscriptionPayment = async (memberId, paymentMode, paymentProof) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/members/${memberId}/confirm-subscription-payment`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payment_mode: paymentMode, // 'online' or 'cash'
+          payment_proof: paymentProof, // URL to payment proof image
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || 'Failed to confirm subscription payment');
+      }
+      const result = await response.json();
+      const updatedMember = result.member || result;
+      setMembers(members.map((m) => (m.id === memberId ? updatedMember : m)));
+      console.log('✓ Subscription payment confirmed for member:', memberId);
+      return updatedMember;
+    } catch (error) {
+      console.error('Error confirming subscription payment:', error);
+      throw error;
+    }
+  };
+
   // CRUD Operations for Invoices (Server-based)
   const addInvoice = async (invoice) => {
     try {
@@ -862,6 +908,8 @@ export function AppProvider({ children }) {
     addMember,
     updateMember,
     deleteMember,
+    markPaymentAsPaid,
+    confirmSubscriptionPayment,
     addInvoice,
     updateInvoice,
     deleteInvoice,

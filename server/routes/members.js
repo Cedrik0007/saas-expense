@@ -4,6 +4,7 @@ import UserModel from "../models/User.js";
 import InvoiceModel from "../models/Invoice.js";
 import { calculateAndUpdateMemberBalance } from "../utils/balance.js";
 import { sendAccountApprovalEmail } from "../utils/emailHelpers.js";
+import { addOneYear, parseDateString, formatDateForInput } from "../utils/dateHelpers.js";
 
 const router = express.Router();
 
@@ -62,6 +63,20 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: "Member ID already exists" });
     }
     
+    // Handle start_date - default to today if not provided
+    let startDate = null;
+    if (req.body.start_date) {
+      startDate = parseDateString(req.body.start_date);
+      if (!startDate) {
+        return res.status(400).json({ message: "Invalid start_date format. Use YYYY-MM-DD" });
+      }
+    } else {
+      // Default to today
+      startDate = new Date();
+      startDate.setHours(0, 0, 0, 0); // Set to start of day
+    }
+    
+    // For new members: payment_status = unpaid, next_due_date = null
     const newMember = new UserModel({
       id: memberId,
       name: req.body.name || '',
@@ -70,8 +85,14 @@ router.post("/", async (req, res) => {
       password: req.body.password || '',
       status: req.body.status || 'Pending',
       balance: req.body.balance || '$0',
-      nextDue: req.body.nextDue || '',
-      lastPayment: req.body.lastPayment || '',
+      nextDue: req.body.nextDue || '',  // Keep for backward compatibility
+      lastPayment: req.body.lastPayment || '',  // Keep for backward compatibility
+      start_date: startDate,
+      last_payment_date: null,
+      next_due_date: null, // Set to null for unpaid members
+      payment_status: "unpaid", // Set to unpaid for new members
+      payment_mode: null,
+      payment_proof: null,
       subscriptionType: req.body.subscriptionType || 'Lifetime',
     });
     
@@ -175,6 +196,22 @@ router.put("/:id", async (req, res) => {
     if (updateData.email) {
       updateData.email = updateData.email.trim().toLowerCase();
     }
+    
+    // Handle start_date update - if provided, recalculate next_due_date
+    if (updateData.start_date) {
+      const startDate = parseDateString(updateData.start_date);
+      if (!startDate) {
+        return res.status(400).json({ message: "Invalid start_date format. Use YYYY-MM-DD" });
+      }
+      updateData.start_date = startDate;
+      // Only recalculate next_due_date if last_payment_date doesn't exist
+      // (if there's a payment, next_due_date should be based on last_payment_date)
+      const existingMember = await UserModel.findOne({ id: req.params.id });
+      if (!existingMember || !existingMember.last_payment_date) {
+        updateData.next_due_date = addOneYear(startDate);
+      }
+    }
+    
     const member = await UserModel.findOneAndUpdate(
       { id: req.params.id },
       { $set: updateData },
@@ -191,6 +228,77 @@ router.put("/:id", async (req, res) => {
     if (error.code === 11000) {
       return res.status(400).json({ message: "Email already exists" });
     }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT mark payment as paid (legacy - kept for backward compatibility)
+router.put("/:id/mark-paid", async (req, res) => {
+  try {
+    await ensureConnection();
+    
+    const member = await UserModel.findOne({ id: req.params.id });
+    if (!member) {
+      return res.status(404).json({ message: "Member not found" });
+    }
+    
+    // Set last_payment_date to current date
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0); // Set to start of day
+    
+    // Calculate next_due_date as exactly 1 year after last_payment_date
+    const nextDueDate = addOneYear(currentDate);
+    
+    // Update member
+    member.last_payment_date = currentDate;
+    member.next_due_date = nextDueDate;
+    await member.save();
+    
+    res.json({ success: true, member });
+  } catch (error) {
+    console.error("Error marking payment as paid:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT confirm subscription payment (new endpoint for subscription management)
+router.put("/:id/confirm-subscription-payment", async (req, res) => {
+  try {
+    await ensureConnection();
+    
+    const member = await UserModel.findOne({ id: req.params.id });
+    if (!member) {
+      return res.status(404).json({ message: "Member not found" });
+    }
+    
+    // Get payment details from request
+    const { payment_mode, payment_proof } = req.body;
+    
+    if (!payment_mode || !['online', 'cash'].includes(payment_mode)) {
+      return res.status(400).json({ message: "Invalid payment_mode. Must be 'online' or 'cash'" });
+    }
+    
+    if (!payment_proof) {
+      return res.status(400).json({ message: "Payment proof is required" });
+    }
+    
+    // Set last_payment_date to exact date/time of confirmation
+    const currentDate = new Date();
+    
+    // Calculate next_due_date as exactly 1 year after last_payment_date
+    const nextDueDate = addOneYear(currentDate);
+    
+    // Update member with all payment information
+    member.payment_status = "paid";
+    member.payment_mode = payment_mode;
+    member.payment_proof = payment_proof;
+    member.last_payment_date = currentDate;
+    member.next_due_date = nextDueDate;
+    await member.save();
+    
+    res.json({ success: true, member });
+  } catch (error) {
+    console.error("Error confirming subscription payment:", error);
     res.status(500).json({ error: error.message });
   }
 });
